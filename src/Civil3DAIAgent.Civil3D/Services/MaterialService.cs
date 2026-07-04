@@ -88,8 +88,12 @@ namespace Civil3DAIAgent.Civil3D.Services
 
                     string name = NameUtils.MakeUnique(VolumeSurfaceBaseName, existingNames);
 
-                    // [VERSION] Create a volume surface: base = existing ground, comparison = datum.
-                    ObjectId volumeId = TinVolumeSurface.Create(name, egId, datumId);
+                    // [VERSION] Late-bound: volume surface (base = EG, comparison = datum).
+                    ObjectId volumeId = (ObjectId)(CivilApi.InvokeStatic(typeof(TinVolumeSurface), "Create",
+                        new object[] { name, egId, datumId }, _logger) ?? ObjectId.Null);
+                    if (volumeId.IsNull)
+                        return OperationResult<string>.Fail(
+                            "Volume surface could not be created (TinVolumeSurface.Create signature mismatch — see the log).");
 
                     string createdName = name;
                     TransactionHelper.InTransaction(db, tr =>
@@ -177,10 +181,19 @@ namespace Civil3DAIAgent.Civil3D.Services
         {
             try
             {
-                // [VERSION] Volume properties expose cut/fill/net (unadjusted) volumes.
-                var props = volumeSurface.GetVolumeProperties();
-                double cut = props.UnadjustedCutVolume;
-                double fill = props.UnadjustedFillVolume;
+                // [VERSION] Late-bound: GetVolumeProperties() returns a struct with cut/fill members
+                // whose names vary (UnadjustedCutVolume / Cut / ...). Read defensively.
+                object props = CivilApi.Invoke(volumeSurface, "GetVolumeProperties", new object[0], _logger);
+                if (props == null)
+                {
+                    warnings.Add("Could not read volume properties (GetVolumeProperties unavailable — see the log).");
+                    return;
+                }
+
+                double cut = CivilApi.GetDouble(props, "UnadjustedCutVolume", double.NaN);
+                if (double.IsNaN(cut)) cut = CivilApi.GetDouble(props, "Cut", 0.0);
+                double fill = CivilApi.GetDouble(props, "UnadjustedFillVolume", double.NaN);
+                if (double.IsNaN(fill)) fill = CivilApi.GetDouble(props, "Fill", 0.0);
 
                 summary.CutVolume = cut * (settings.CutFactor <= 0 ? 1.0 : settings.CutFactor);
                 summary.FillVolume = fill * (settings.FillFactor <= 0 ? 1.0 : settings.FillFactor);

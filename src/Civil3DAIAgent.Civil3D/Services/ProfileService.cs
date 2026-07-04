@@ -59,8 +59,12 @@ namespace Civil3DAIAgent.Civil3D.Services
 
                     string name = NameUtils.MakeUnique(settings.ExistingGroundName, GetProfileNames(db, alignmentId));
 
-                    // Args: name, alignmentId, surfaceId, layerId (Null = default), styleId.
-                    ObjectId profileId = Profile.CreateFromSurface(name, alignmentId, surfaceId, ObjectId.Null, styleId);
+                    // [VERSION] Late-bound: CreateFromSurface arg list varies by release (the log reports it).
+                    ObjectId profileId = (ObjectId)(CivilApi.InvokeStatic(typeof(Profile), "CreateFromSurface",
+                        new object[] { name, alignmentId, surfaceId, ObjectId.Null, styleId }, _logger) ?? ObjectId.Null);
+                    if (profileId.IsNull)
+                        return OperationResult<string>.Fail(
+                            "EG profile could not be created (Profile.CreateFromSurface signature mismatch — see the log).");
 
                     string handle = ReadProfileHandle(db, profileId, out double minElev, out double maxElev);
                     _logger.Info(string.Format(CultureInfo.InvariantCulture,
@@ -101,8 +105,12 @@ namespace Civil3DAIAgent.Civil3D.Services
 
                     string name = NameUtils.MakeUnique(settings.DesignName, GetProfileNames(db, alignmentId));
 
-                    // Args: name, alignmentId, layerId (Null), styleId. Creates an empty layout profile.
-                    ObjectId profileId = Profile.CreateByLayout(name, alignmentId, ObjectId.Null, styleId);
+                    // [VERSION] Late-bound: CreateByLayout arg list varies by release (the log reports it).
+                    ObjectId profileId = (ObjectId)(CivilApi.InvokeStatic(typeof(Profile), "CreateByLayout",
+                        new object[] { name, alignmentId, ObjectId.Null, styleId }, _logger) ?? ObjectId.Null);
+                    if (profileId.IsNull)
+                        return OperationResult<string>.Fail(
+                            "Design profile could not be created (Profile.CreateByLayout signature mismatch — see the log).");
 
                     int pviCount = 0;
                     if (settings.AutoGenerateFromExistingGround &&

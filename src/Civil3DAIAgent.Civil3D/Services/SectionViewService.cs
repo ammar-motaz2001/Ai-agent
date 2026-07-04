@@ -76,13 +76,21 @@ namespace Civil3DAIAgent.Civil3D.Services
 
                         try
                         {
-                            // [VERSION] Create the section view at the computed grid location.
-                            ObjectId svId = SectionView.Create(slId, insertion);
-                            TransactionHelper.InTransaction(db, tr =>
+                            // [VERSION] Late-bound: create the section view at the computed grid location.
+                            ObjectId svId = (ObjectId)(CivilApi.InvokeStatic(typeof(SectionView), "Create",
+                                new object[] { slId, insertion }, _logger) ?? ObjectId.Null);
+                            if (svId.IsNull)
                             {
-                                var sv = (SectionView)tr.GetObject(svId, OpenMode.ForRead);
-                                handles.Add(sv.Handle.ToString());
-                            });
+                                warnings.Add($"Section view #{index + 1}: SectionView.Create signature mismatch (see the log).");
+                            }
+                            else
+                            {
+                                TransactionHelper.InTransaction(db, tr =>
+                                {
+                                    var sv = (SectionView)tr.GetObject(svId, OpenMode.ForRead);
+                                    handles.Add(sv.Handle.ToString());
+                                });
+                            }
                         }
                         catch (Exception ex)
                         {

@@ -15,6 +15,8 @@ using Civil3DAIAgent.Models.Results;
 using Civil3DAIAgent.Utilities.Text;
 // Disambiguate: Autodesk.Civil.DatabaseServices.Surface vs Autodesk.AutoCAD.DatabaseServices.Surface.
 using CivSurface = Autodesk.Civil.DatabaseServices.Surface;
+// Disambiguate: Autodesk.Civil.DatabaseServices.Entity vs Autodesk.AutoCAD.DatabaseServices.Entity.
+using AcEntity = Autodesk.AutoCAD.DatabaseServices.Entity;
 
 namespace Civil3DAIAgent.Civil3D.Services
 {
@@ -85,10 +87,19 @@ namespace Civil3DAIAgent.Civil3D.Services
                             var contourIds = CollectContourIds(db, tr, contourLayersCsv);
                             if (contourIds.Count > 0)
                             {
-                                surface.ContoursDefinition.AddContourData(
-                                    contourIds, WeedDistance, WeedAngleRad, SupplementDistance, SupplementMidOrdinate);
-                                _logger.Info($"Added {contourIds.Count} contour(s) to the EG surface.", Category);
-                                dataSources++;
+                                // [VERSION] Late-bound: AddContourData arg list varies by release (logged on miss).
+                                bool ok = CivilApi.TryInvoke(surface.ContoursDefinition, "AddContourData",
+                                    new object[] { contourIds, WeedDistance, WeedAngleRad, SupplementDistance, SupplementMidOrdinate },
+                                    _logger);
+                                if (ok)
+                                {
+                                    _logger.Info($"Added {contourIds.Count} contour(s) to the EG surface.", Category);
+                                    dataSources++;
+                                }
+                                else
+                                {
+                                    warnings.Add("Contour data could not be added (AddContourData signature mismatch — see the log).");
+                                }
                             }
                             else
                             {
@@ -137,7 +148,7 @@ namespace Civil3DAIAgent.Civil3D.Services
             var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
             foreach (ObjectId id in ms)
             {
-                if (tr.GetObject(id, OpenMode.ForRead) is Entity ent &&
+                if (tr.GetObject(id, OpenMode.ForRead) is AcEntity ent &&
                     (ent is Polyline || ent is Polyline2d || ent is Polyline3d || ent is Line) &&
                     layers.Any(l => string.Equals(l, ent.Layer, StringComparison.OrdinalIgnoreCase)))
                 {

@@ -80,9 +80,6 @@ namespace Civil3DAIAgent.Civil3D.Diagnostics
                 case ErrorStatus.FileSharingViolation:
                     return "The file is locked by another process. Close the drawing/PDF in any other " +
                            "program and try again.";
-                case ErrorStatus.InsufficientMemory:
-                    return "Civil 3D ran out of memory during the operation. Try a shorter road segment " +
-                           "or a coarser sampling interval.";
                 case ErrorStatus.CannotBeErasedByCaller:
                 case ErrorStatus.CannotBeResurrected:
                     return "An object could not be modified because it is referenced by other objects " +

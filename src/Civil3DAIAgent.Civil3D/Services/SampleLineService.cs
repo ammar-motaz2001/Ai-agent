@@ -53,8 +53,12 @@ namespace Civil3DAIAgent.Civil3D.Services
                     if (!HandleUtils.TryResolve(db, alignmentHandle, out var alignmentId))
                         return OperationResult<string>.Fail("Could not find the alignment for the sample lines.");
 
-                    // [VERSION] Create the sample-line group on the alignment.
-                    ObjectId groupId = SampleLineGroup.Create(settings.GroupName, alignmentId);
+                    // [VERSION] Late-bound: SampleLineGroup.Create signature varies (logged on miss).
+                    ObjectId groupId = (ObjectId)(CivilApi.InvokeStatic(typeof(SampleLineGroup), "Create",
+                        new object[] { settings.GroupName, alignmentId }, _logger) ?? ObjectId.Null);
+                    if (groupId.IsNull)
+                        return OperationResult<string>.Fail(
+                            "Sample-line group could not be created (SampleLineGroup.Create signature mismatch — see the log).");
 
                     // Register data sources (surfaces + corridor) best-effort.
                     RegisterDataSources(db, groupId, surfaceHandlesToSample, corridorHandle, warnings);
@@ -98,11 +102,14 @@ namespace Civil3DAIAgent.Civil3D.Services
                     {
                         string name = FormatStationName(station);
 
-                        // [VERSION] Per-station sample line creation. Some releases expose a swath-width
-                        // overload; we create with defaults then set widths defensively below.
-                        ObjectId slId = SampleLine.Create(name, groupId, station);
-                        TrySetSwathWidths(tr, slId, settings);
-                        count++;
+                        // [VERSION] Late-bound per-station sample-line creation.
+                        ObjectId slId = (ObjectId)(CivilApi.InvokeStatic(typeof(SampleLine), "Create",
+                            new object[] { name, groupId, station }, _logger) ?? ObjectId.Null);
+                        if (!slId.IsNull)
+                        {
+                            TrySetSwathWidths(tr, slId, settings);
+                            count++;
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -124,9 +131,9 @@ namespace Civil3DAIAgent.Civil3D.Services
             try
             {
                 var sl = (SampleLine)tr.GetObject(sampleLineId, OpenMode.ForWrite);
-                // Property names are stable on recent releases; wrapped for portability.
-                sl.SwathWidthLeft = settings.SwathWidthLeft;
-                sl.SwathWidthRight = settings.SwathWidthRight;
+                // [VERSION] Late-bound property set; falls back to the group's default swath if absent.
+                CivilApi.TrySet(sl, "SwathWidthLeft", settings.SwathWidthLeft, _logger);
+                CivilApi.TrySet(sl, "SwathWidthRight", settings.SwathWidthRight, _logger);
             }
             catch
             {
@@ -150,8 +157,8 @@ namespace Civil3DAIAgent.Civil3D.Services
                         {
                             if (HandleUtils.TryResolve(db, h, out var surfaceId))
                             {
-                                // [VERSION] Add a surface as a sampled source.
-                                try { group.AddSampledSurface(surfaceId); } catch { /* differs by release */ }
+                                // [VERSION] Late-bound: add a surface as a sampled data source.
+                                CivilApi.TryInvoke(group, "AddSampledSurface", new object[] { surfaceId }, _logger);
                             }
                         }
                     }

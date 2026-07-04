@@ -62,14 +62,14 @@ namespace Civil3DAIAgent.Civil3D.Services
                     // siteId = ObjectId.Null keeps the alignment "siteless" (recommended for corridor
                     // design so it does not interact with parcels/other siteless geometry).
                     // Args: name, site, polyline, style, labelSet, eraseExistingEntities, addCurvesBetweenTangents.
-                    ObjectId alignmentId = Alignment.CreateFromPolyline(
-                        name,
-                        ObjectId.Null,
-                        polylineId,
-                        styleId,
-                        labelSetId,
-                        false,
-                        true);
+                    // [VERSION] Late-bound: signature varies; the log reports the real overloads if this misses.
+                    ObjectId alignmentId = (ObjectId)(CivilApi.InvokeStatic(typeof(Alignment), "CreateFromPolyline",
+                        new object[] { name, ObjectId.Null, polylineId, styleId, labelSetId, false, true }, _logger)
+                        ?? ObjectId.Null);
+                    if (alignmentId.IsNull)
+                        return OperationResult<string>.Fail(
+                            "Alignment could not be created (Alignment.CreateFromPolyline signature mismatch for this " +
+                            "Civil 3D version — see the log for the actual API overloads).");
 
                     string handle = null;
                     TransactionHelper.InTransaction(db, tr =>

@@ -49,8 +49,12 @@ namespace Civil3DAIAgent.Civil3D.Services
                     // Place the profile view clear of the plan geometry (below the drawing extents).
                     Point3d insertion = BelowExtents(db);
 
-                    // [VERSION] Simple overload creates a profile view showing the alignment's profiles.
-                    ObjectId profileViewId = ProfileView.Create(alignmentId, insertion);
+                    // [VERSION] Late-bound: creates a profile view showing the alignment's profiles.
+                    ObjectId profileViewId = (ObjectId)(CivilApi.InvokeStatic(typeof(ProfileView), "Create",
+                        new object[] { alignmentId, insertion }, _logger) ?? ObjectId.Null);
+                    if (profileViewId.IsNull)
+                        return OperationResult<IReadOnlyList<string>>.Fail(
+                            "Profile view could not be created (ProfileView.Create signature mismatch — see the log).");
 
                     var handles = new List<string>();
                     TransactionHelper.InTransaction(db, tr =>

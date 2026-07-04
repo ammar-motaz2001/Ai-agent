@@ -147,13 +147,15 @@ namespace Civil3DAIAgent.Civil3D.Services
                 return current;
             }
 
-            tempDwg = Path.Combine(outputFolder, "_publish_source.dwg");
+            // Use a local (out params cannot be captured by a lambda), then assign the out param.
+            string temp = Path.Combine(outputFolder, "_publish_source.dwg");
             TransactionHelper.InDocumentLock(doc, () =>
             {
-                doc.Database.SaveAs(tempDwg, DwgVersion.Current);
+                doc.Database.SaveAs(temp, DwgVersion.Current);
             });
-            _logger.Debug("Saved a temporary publish copy: " + tempDwg, Category);
-            return tempDwg;
+            tempDwg = temp;
+            _logger.Debug("Saved a temporary publish copy: " + temp, Category);
+            return temp;
         }
 
         /// <summary>Builds the destination PDF path from the pattern, expanding {drawing} and {date}.</summary>

@@ -63,7 +63,13 @@ namespace Civil3DAIAgent.Civil3D.Services
 
                     // Place the assembly marker clear of the road geometry, near the drawing extents.
                     Point3d location = ComputeAssemblyLocation(db);
-                    ObjectId assemblyId = Assembly.Create(settings.Name, styleId);
+                    // [VERSION] Late-bound: Assembly.Create signature varies by release.
+                    ObjectId assemblyId = (ObjectId)(CivilApi.InvokeStatic(typeof(Assembly), "Create",
+                        new object[] { settings.Name, styleId }, _logger) ?? ObjectId.Null);
+                    if (assemblyId.IsNull)
+                        return OperationResult<string>.Fail(
+                            "Assembly could not be created (Assembly.Create signature mismatch — see the log for " +
+                            "the actual API overloads).");
 
                     string handle = null;
                     TransactionHelper.InTransaction(db, tr =>

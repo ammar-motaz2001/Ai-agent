@@ -130,17 +130,11 @@ namespace Civil3DAIAgent.Civil3D.Services
                         CorridorSurface surface = corridor.CorridorSurfaces.Add(surfaceName);
                         resultName = surface.Name;
 
-                        bool linkExists = CorridorHasLinkCode(corridor, linkCode);
-                        if (linkExists)
-                        {
-                            surface.AddLinkData(linkCode);
-                        }
-                        else
-                        {
-                            warnings.Add($"The corridor produced no links coded '{linkCode}', so the {label} " +
-                                         "surface will be empty. This is expected when the assembly has no " +
-                                         "subassemblies (see the assembly step warning).");
-                        }
+                        // [VERSION] Late-bound: build the surface from links of the given code.
+                        bool ok = CivilApi.TryInvoke(surface, "AddLinkData", new object[] { linkCode }, _logger);
+                        if (!ok)
+                            warnings.Add($"Could not add link data '{linkCode}' to the {label} surface " +
+                                         "(AddLinkData signature mismatch, or the assembly produced no such links — see the log).");
                     });
 
                     RebuildCorridor(db, corridorId);
@@ -163,24 +157,13 @@ namespace Civil3DAIAgent.Civil3D.Services
         /// <summary>Attempts to set the assembly-application frequency on a region; never throws.</summary>
         private void TrySetFrequencies(BaselineRegion region, CorridorSettings settings)
         {
-            try
-            {
-                // These setters exist on recent releases; wrapped defensively for portability.
-                region.AppliedAssemblySync = false;
-                region.setFrequency(
-                    settings.FrequencyTangent, // along tangents
-                    settings.FrequencyCurve,   // along curves
-                    settings.FrequencyCurve,   // along spirals
-                    settings.FrequencyTangent  // along profile curves
-                );
-            }
-            catch
-            {
-                _logger.Warn(
-                    "Could not set the corridor assembly frequency programmatically; Civil 3D defaults " +
-                    "were used. Adjust in the Corridor Properties dialog if a specific frequency is required.",
-                    Category);
-            }
+            // [VERSION] Late-bound and optional: setFrequency's signature varies; defaults apply if absent.
+            bool ok = CivilApi.TryInvoke(region, "setFrequency",
+                new object[] { settings.FrequencyTangent, settings.FrequencyCurve, settings.FrequencyCurve, settings.FrequencyTangent },
+                _logger);
+            if (!ok)
+                _logger.Warn("Could not set the corridor assembly frequency programmatically; Civil 3D defaults " +
+                             "were used. Adjust in Corridor Properties if a specific frequency is required.", Category);
         }
 
         /// <summary>Rebuilds the corridor, tolerating "rebuild produced warnings" states.</summary>
@@ -201,28 +184,5 @@ namespace Civil3DAIAgent.Civil3D.Services
             }
         }
 
-        /// <summary>True when any of the corridor's applied links use the given code.</summary>
-        private static bool CorridorHasLinkCode(Corridor corridor, string linkCode)
-        {
-            try
-            {
-                foreach (Baseline bl in corridor.Baselines)
-                {
-                    foreach (BaselineRegion region in bl.BaselineRegions)
-                    {
-                        foreach (string code in region.AssemblyReferences?.LinkCodes ?? new string[0])
-                        {
-                            if (string.Equals(code, linkCode, StringComparison.OrdinalIgnoreCase)) return true;
-                        }
-                    }
-                }
-            }
-            catch
-            {
-                // If the API surface differs, assume the code may exist and let AddLinkData decide.
-                return true;
-            }
-            return false;
-        }
     }
 }
