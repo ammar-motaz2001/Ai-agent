@@ -52,9 +52,17 @@ namespace Civil3DAIAgent.Services.Composition
             var services = new ServiceCollection();
 
             // ---- Logging ----
-            // The UI sink is the permanent target; the RoutingLogger adds a per-run file logger.
+            // Permanent sinks = UI window (Information) + an always-on crash log at
+            // C:\Temp\Civil3DAIAgent.log (Trace, auto-flushed every line) so the LAST line written
+            // before an unmanaged crash identifies the exact failing call. The RoutingLogger also
+            // attaches a per-run <output>\logs file during a run.
             services.AddSingleton(new UiLogSink(LogLevel.Information));
-            services.AddSingleton(sp => new RoutingLogger(sp.GetRequiredService<UiLogSink>()));
+            services.AddSingleton(sp =>
+            {
+                var ui = sp.GetRequiredService<UiLogSink>();
+                var crash = new FileLogger(@"C:\Temp\Civil3DAIAgent.log", LogLevel.Trace);
+                return new RoutingLogger(new CompositeLogger(ui, crash));
+            });
             services.AddSingleton<ILogger>(sp => sp.GetRequiredService<RoutingLogger>());
 
             // ---- Cross-cutting Civil 3D helpers ----

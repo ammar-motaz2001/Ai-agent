@@ -31,6 +31,7 @@ namespace Civil3DAIAgent.UI.ViewModels
         private string _inputExcelPath = "";
         private string _outputFolder = "";
         private double _segmentLengthMeters;
+        private int _maxStep = 1; // DEBUG default: run only step 1. Set 0 to run all 23.
         private bool _isRunning;
         private double _progressValue;
         private string _statusText = "Ready.";
@@ -81,6 +82,12 @@ namespace Civil3DAIAgent.UI.ViewModels
 
         /// <summary>Extraction length (metres); overrides the configured default when &gt; 0.</summary>
         public double SegmentLengthMeters { get => _segmentLengthMeters; set => SetProperty(ref _segmentLengthMeters, value); }
+
+        /// <summary>
+        /// DEBUG: run only the first N steps (0 = all 23). Increase one at a time to isolate a crashing
+        /// step. The full run log (and C:\Temp\Civil3DAIAgent.log) records exactly where it stops.
+        /// </summary>
+        public int MaxStep { get => _maxStep; set => SetProperty(ref _maxStep, value); }
 
         /// <summary>True while a run is in progress (drives control enable/disable).</summary>
         public bool IsRunning
@@ -139,8 +146,11 @@ namespace Civil3DAIAgent.UI.ViewModels
                 InputDwgPath = InputDwgPath?.Trim(),
                 InputExcelPath = InputExcelPath?.Trim(),
                 OutputFolder = OutputFolder?.Trim(),
-                SegmentLengthMetersOverride = SegmentLengthMeters
+                SegmentLengthMetersOverride = SegmentLengthMeters,
+                MaxStep = MaxStep
             };
+
+            AppendLog(LogLevel.Information, $"START clicked. MaxStep={MaxStep} (0=all). Crash log: C:\\Temp\\Civil3DAIAgent.log", "UI");
 
             // Pre-flight validation with friendly feedback.
             var validation = _automation.ValidateInputs(request);

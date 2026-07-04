@@ -72,8 +72,14 @@
             <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal">
                 <TextBox Width="120" Margin="0,3" Padding="4,3"
                          Text="{Binding SegmentLengthMeters, UpdateSourceTrigger=PropertyChanged}"/>
-                <TextBlock Text="(0 uses the value from appsettings.json)" VerticalAlignment="Center"
+                <TextBlock Text="(0 uses appsettings.json)" VerticalAlignment="Center"
                            Margin="10,0,0,0" Foreground="Gray"/>
+                <TextBlock Text="Run up to step (debug):" VerticalAlignment="Center"
+                           Margin="24,0,4,0" FontWeight="SemiBold" Foreground="#B00"/>
+                <TextBox Width="50" Margin="0,3" Padding="4,3"
+                         Text="{Binding MaxStep, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="0 = all 23 steps. Set 1, then 2, 3… to isolate a crashing step."/>
+                <TextBlock Text="(0 = all)" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="Gray"/>
             </StackPanel>
         </Grid>
 

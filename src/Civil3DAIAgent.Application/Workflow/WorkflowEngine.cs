@@ -118,6 +118,11 @@ namespace Civil3DAIAgent.Application.Workflow
                     return result; // No steps run; OverallSuccess will be true only if there are no steps — treat as failure via message
                 }
 
+                // DEBUG/BISECTION gate: run only the first request.MaxStep steps (0 = all).
+                int maxStep = request?.MaxStep ?? 0;
+                if (maxStep > 0)
+                    runLogger.Warn($"DEBUG MODE: MaxStep = {maxStep}. Only the first {maxStep} step(s) will run.", Category);
+
                 using (var context = new WorkflowContext(request, settings, runLogger, ct))
                 {
                     int total = _steps.Count;
@@ -125,6 +130,13 @@ namespace Civil3DAIAgent.Application.Workflow
 
                     foreach (var step in _steps)
                     {
+                        if (maxStep > 0 && completed >= maxStep)
+                        {
+                            runLogger.Warn($"DEBUG MODE: reached MaxStep ({maxStep}); stopping before " +
+                                           $"step {(int)step.StepType} ({step.DisplayName}).", Category);
+                            break;
+                        }
+
                         runLogger.Info($"──► BEGIN step {(int)step.StepType}/23: {step.DisplayName}", Category);
                         ReportProgress(progress, completed, total, step, StepStatus.Running);
 

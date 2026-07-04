@@ -69,6 +69,9 @@ namespace Civil3DAIAgent.Logging
                 try
                 {
                     _writer.WriteLine(entry.ToLogLine());
+                    // Flush the writer AND the underlying stream so the last line survives a hard
+                    // (process-terminating) crash — critical for pinpointing a crashing API call.
+                    _writer.Flush();
                 }
                 catch
                 {

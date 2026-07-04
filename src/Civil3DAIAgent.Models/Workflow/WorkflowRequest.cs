@@ -27,5 +27,12 @@ namespace Civil3DAIAgent.Models.Workflow
         /// auto-detects the longest polyline on a configured road layer.
         /// </summary>
         public string SelectedPolylineHandle { get; set; } = "";
+
+        /// <summary>
+        /// DEBUG/BISECTION gate: run only steps 1..<see cref="MaxStep"/> (by <c>WorkflowStepType</c>
+        /// ordinal), then stop. 0 = run all 23 steps. Used to isolate a crashing step by increasing it
+        /// one at a time (1, 2, 3, …).
+        /// </summary>
+        public int MaxStep { get; set; } = 0;
     }
 }
