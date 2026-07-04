@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Civil3DAIAgent.Utilities
+    ========================
+    Small, pure, dependency-light helper functions (unit conversion, token replacement, argument
+    guards). No Autodesk references so it stays fully unit-testable. Referenced by any layer.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Civil3DAIAgent.Utilities</RootNamespace>
+    <AssemblyName>Civil3DAIAgent.Utilities</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Civil3DAIAgent.Models\Civil3DAIAgent.Models.csproj" />
+  </ItemGroup>
+
+</Project>

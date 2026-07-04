@@ -1,0 +1,59 @@
+<Project>
+
+  <!--
+    Directory.Build.props
+    =====================
+    MSBuild automatically imports this file for EVERY project in the solution
+    (it walks up the folder tree until it finds one). It is the single place to
+    define settings shared by all projects so we never repeat ourselves.
+
+    TARGET: Civil 3D 2022 (this project's configured target). Civil 3D 2021-2024 all
+    run on .NET Framework 4.8, so net48 is correct for 2022. Civil 3D 2025 moved to
+    .NET 8 — if you ever retarget, change <TargetFramework> to net8.0-windows and
+    update the Civil 3D assembly references (see docs/DEVELOPER_GUIDE.md).
+  -->
+
+  <PropertyGroup>
+    <!-- Target framework shared by every project. -->
+    <TargetFramework>net48</TargetFramework>
+
+    <!-- Language + safety. -->
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>            <!-- net48 has limited nullable support; kept off for API interop. -->
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>       <!-- Do not require XML docs on every single member. -->
+
+    <!-- Product metadata (surfaced in the compiled DLL properties). -->
+    <Product>Civil3D AI Agent</Product>
+    <Company>Civil3D AI Agent</Company>
+    <Version>1.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Authors>Civil3D AI Agent Team</Authors>
+    <Copyright>Copyright (c) 2026</Copyright>
+    <Platforms>x64</Platforms>              <!-- Civil 3D is 64-bit only. -->
+    <PlatformTarget>x64</PlatformTarget>
+
+    <!-- Deterministic, reproducible builds. -->
+    <Deterministic>true</Deterministic>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <!--
+    Civil 3D / AutoCAD managed assemblies (acdbmgd, acmgd, AecBaseMgd,
+    AeccDbMgd, ...) live inside the Civil 3D install folder. They must NOT be
+    copied into our output folder (CopyLocal=false) because they are already
+    loaded by the host process; copying them causes version conflicts.
+
+    Set the CIVIL3D_PATH environment variable (or override in a project) to your
+    install, e.g. (Civil 3D 2022):
+        C:\Program Files\Autodesk\AutoCAD 2022
+    See docs/INSTALLATION.md.
+  -->
+  <PropertyGroup>
+    <Civil3DPath Condition="'$(Civil3DPath)' == '' AND '$(CIVIL3D_PATH)' != ''">$(CIVIL3D_PATH)</Civil3DPath>
+    <Civil3DPath Condition="'$(Civil3DPath)' == ''">C:\Program Files\Autodesk\AutoCAD 2022</Civil3DPath>
+  </PropertyGroup>
+
+</Project>

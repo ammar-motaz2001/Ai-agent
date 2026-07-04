@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Civil3DAIAgent.Civil3D
+    ======================
+    The ONLY project (besides Commands) that references the Autodesk managed API. It implements the
+    Core ports that need Civil 3D (PDF publishing, exception explanation) and defines + implements the
+    domain services that wrap each Civil 3D operation (alignment, surface, profile, corridor, ...).
+
+    The Autodesk assemblies come from Civil3D.References.props with CopyLocal=false: they are already
+    loaded by the Civil 3D process at NETLOAD time, so we must NOT copy our own versions.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Civil3DAIAgent.Civil3D</RootNamespace>
+    <AssemblyName>Civil3DAIAgent.Civil3D</AssemblyName>
+  </PropertyGroup>
+
+  <!-- Autodesk AutoCAD + Civil 3D managed references (CopyLocal=false). -->
+  <Import Project="..\Civil3D.References.props" />
+
+  <ItemGroup>
+    <ProjectReference Include="..\Civil3DAIAgent.Models\Civil3DAIAgent.Models.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Core\Civil3DAIAgent.Core.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Logging\Civil3DAIAgent.Logging.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Utilities\Civil3DAIAgent.Utilities.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Civil3DAIAgent.Logging
+    ======================
+    Cross-cutting logging abstraction and lightweight implementations (file, in-memory/UI,
+    composite, null). Kept dependency-free (only references Models) so any layer can log without
+    pulling in a heavy third-party logging framework.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Civil3DAIAgent.Logging</RootNamespace>
+    <AssemblyName>Civil3DAIAgent.Logging</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Civil3DAIAgent.Models\Civil3DAIAgent.Models.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Civil3DAIAgent.Commands
+    =======================
+    The assembly you NETLOAD into Civil 3D. It exposes the AutoCAD command(s) that launch the tool and
+    an IExtensionApplication for load/unload hooks. It is deliberately tiny: it resolves the automation
+    facade from the composition root and hands off to the UI launcher.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Civil3DAIAgent.Commands</RootNamespace>
+    <AssemblyName>Civil3DAIAgent.Commands</AssemblyName>
+    <!-- This is the primary NETLOAD target; ensure dependencies are copied next to it. -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <Import Project="..\Civil3D.References.props" />
+
+  <ItemGroup>
+    <ProjectReference Include="..\Civil3DAIAgent.Models\Civil3DAIAgent.Models.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Logging\Civil3DAIAgent.Logging.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Services\Civil3DAIAgent.Services.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.UI\Civil3DAIAgent.UI.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,70 @@
+# ============================================================================
+#  Civil3D AI Agent — .gitignore
+# ============================================================================
+
+# ---- Build output ----
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+[Ll]og/
+[Ll]ogs/
+
+# ---- Visual Studio / Rider / VS Code ----
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.rsuser
+
+# ---- NuGet ----
+packages/
+*.nupkg
+*.snupkg
+.nuget/
+project.lock.json
+project.assets.json
+*.nuget.props
+*.nuget.targets
+
+# ---- Test / coverage ----
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+
+# ---- OS clutter ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- CAD / data files (kept out of the repo; supply your own inputs) ----
+# Excluded deliberately: possibly proprietary client data. See docs/examples.
+*.dwg
+*.dwt
+*.dws
+*.dxf
+*.bak
+*.dwl
+*.dwl2
+*.xlsx
+*.xls
+*.csv
+
+# ---- Generated automation output ----
+*.pdf
+*.dsd
+*.dst
+
+# ---- Misc ----
+*.log
+*.tmp

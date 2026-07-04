@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Civil3DAIAgent.UI
+    =================
+    The WPF (MVVM) desktop UI, hosted INSIDE Civil 3D as a modeless window (there is no App.xaml /
+    StartupUri because the AutoCAD process owns the message loop). Uses WinForms only for the folder
+    picker. References the automation facade (Services) and the Autodesk assemblies for
+    ShowModelessWindow / ExecuteInCommandContextAsync.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Civil3DAIAgent.UI</RootNamespace>
+    <AssemblyName>Civil3DAIAgent.UI</AssemblyName>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <Import Project="..\Civil3D.References.props" />
+
+  <ItemGroup>
+    <ProjectReference Include="..\Civil3DAIAgent.Models\Civil3DAIAgent.Models.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Core\Civil3DAIAgent.Core.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Logging\Civil3DAIAgent.Logging.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Utilities\Civil3DAIAgent.Utilities.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Services\Civil3DAIAgent.Services.csproj" />
+  </ItemGroup>
+
+</Project>

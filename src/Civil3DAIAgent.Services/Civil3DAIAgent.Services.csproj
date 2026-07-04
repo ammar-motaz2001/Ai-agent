@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Civil3DAIAgent.Services
+    =======================
+    The composition root + high-level facade. It is the one place that knows about every concrete
+    implementation, wiring them together with Microsoft.Extensions.DependencyInjection. The UI and the
+    NETLOAD command depend only on this project's IAutomationService facade, not on the individual
+    layers, keeping the entry points thin.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Civil3DAIAgent.Services</RootNamespace>
+    <AssemblyName>Civil3DAIAgent.Services</AssemblyName>
+  </PropertyGroup>
+
+  <Import Project="..\Civil3D.References.props" />
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Civil3DAIAgent.Models\Civil3DAIAgent.Models.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Core\Civil3DAIAgent.Core.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Logging\Civil3DAIAgent.Logging.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Utilities\Civil3DAIAgent.Utilities.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Infrastructure\Civil3DAIAgent.Infrastructure.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Civil3D\Civil3DAIAgent.Civil3D.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Application\Civil3DAIAgent.Application.csproj" />
+  </ItemGroup>
+
+</Project>

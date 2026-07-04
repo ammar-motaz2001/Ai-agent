@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Civil3DAIAgent.Tests
+    ====================
+    xUnit tests for the layers that do NOT require the live Civil 3D API: Models, Utilities, Core,
+    Logging, Infrastructure, and the Application workflow engine (exercised with fake steps). The
+    Civil3D operation classes themselves are integration-tested inside Civil 3D (see the Developer
+    Guide) because they need the running host.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Civil3DAIAgent.Tests</RootNamespace>
+    <AssemblyName>Civil3DAIAgent.Tests</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
+    <PackageReference Include="xunit" Version="2.4.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5" />
+    <PackageReference Include="ClosedXML" Version="0.102.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Civil3DAIAgent.Models\Civil3DAIAgent.Models.csproj" />
+    <ProjectReference Include="..\..\src\Civil3DAIAgent.Core\Civil3DAIAgent.Core.csproj" />
+    <ProjectReference Include="..\..\src\Civil3DAIAgent.Logging\Civil3DAIAgent.Logging.csproj" />
+    <ProjectReference Include="..\..\src\Civil3DAIAgent.Utilities\Civil3DAIAgent.Utilities.csproj" />
+    <ProjectReference Include="..\..\src\Civil3DAIAgent.Infrastructure\Civil3DAIAgent.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Civil3DAIAgent.Application\Civil3DAIAgent.Application.csproj" />
+  </ItemGroup>
+
+</Project>

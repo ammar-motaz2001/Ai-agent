@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Civil3DAIAgent.Infrastructure
+    =============================
+    Implements the Core "port" interfaces that talk to the outside world but do NOT need Civil 3D:
+      * JSON configuration loading      (Newtonsoft.Json)
+      * Excel point parsing             (ClosedXML)
+      * File-system services
+
+    Third-party packages are safe here because none of them are loaded by the Civil 3D host at
+    NETLOAD time (unlike the Autodesk assemblies). They are copied next to the plugin.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Civil3DAIAgent.Infrastructure</RootNamespace>
+    <AssemblyName>Civil3DAIAgent.Infrastructure</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="ClosedXML" Version="0.102.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Civil3DAIAgent.Models\Civil3DAIAgent.Models.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Core\Civil3DAIAgent.Core.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Logging\Civil3DAIAgent.Logging.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Civil3DAIAgent.Core
+    ===================
+    The domain/abstraction layer. Defines the interfaces (ports) that outer layers implement:
+    configuration, Excel reading, file services, PDF publishing, and the workflow engine
+    abstractions. Deliberately contains NO Autodesk/Civil 3D types so it stays host-independent and
+    unit-testable. It references only Models and the Logging abstraction.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Civil3DAIAgent.Core</RootNamespace>
+    <AssemblyName>Civil3DAIAgent.Core</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Civil3DAIAgent.Models\Civil3DAIAgent.Models.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Logging\Civil3DAIAgent.Logging.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,67 @@
+<Project>
+
+  <!--
+    Civil3D.References.props
+    ========================
+    Shared reference block for the two projects that touch the Autodesk managed
+    API directly (Civil3DAIAgent.Civil3D and Civil3DAIAgent.Commands). Import it
+    from a project with:
+
+        <Import Project="..\Civil3D.References.props" />
+
+    CopyLocal is FALSE on every reference: these DLLs are provided by the running
+    Civil 3D process. Copying them into our bin folder would load a second,
+    conflicting copy and crash the host at NETLOAD time.
+
+    The <Civil3DPath> property is defined in the repo-root Directory.Build.props.
+  -->
+
+  <ItemGroup>
+    <!-- Core AutoCAD database + editor + application. -->
+    <Reference Include="acdbmgd">
+      <HintPath>$(Civil3DPath)\acdbmgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="acmgd">
+      <HintPath>$(Civil3DPath)\acmgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="accoremgd">
+      <HintPath>$(Civil3DPath)\accoremgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- AEC base layer (shared by all AEC verticals). -->
+    <Reference Include="AecBaseMgd">
+      <HintPath>$(Civil3DPath)\ACA\AecBaseMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AecPropDataMgd">
+      <HintPath>$(Civil3DPath)\ACA\AecPropDataMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- Civil 3D managed API (surfaces, alignments, corridors, sections...). -->
+    <Reference Include="AeccDbMgd">
+      <HintPath>$(Civil3DPath)\C3D\AeccDbMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AeccPressurePipesMgd">
+      <HintPath>$(Civil3DPath)\C3D\AeccPressurePipesMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- Publishing / plotting (PDF + DSD sheet-set publishing). -->
+    <Reference Include="AcPublishMgd">
+      <HintPath>$(Civil3DPath)\AcPublishMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- Managed interop shims used by some API calls. -->
+    <Reference Include="AdWindows">
+      <HintPath>$(Civil3DPath)\AdWindows.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

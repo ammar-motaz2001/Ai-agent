@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Civil3DAIAgent.Models
+    =====================
+    The innermost layer of the clean architecture. Contains pure data types:
+    enums, DTOs, configuration models, and result types. It has NO project
+    references and NO third-party dependencies, so every other layer can depend
+    on it freely without creating cycles.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Civil3DAIAgent.Models</RootNamespace>
+    <AssemblyName>Civil3DAIAgent.Models</AssemblyName>
+  </PropertyGroup>
+
+</Project>

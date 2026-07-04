@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Civil3DAIAgent.Application
+    ==========================
+    The orchestration layer. Contains the workflow engine (executes the 23 steps in order with
+    per-step timing, logging, recovery, cancellation) and the 23 thin step classes that each adapt one
+    Civil3D service call to the IWorkflowStep contract. It references the Civil3D layer (service
+    interfaces) and imports the Autodesk references because steps pass the active Document to services.
+    It does NOT reference Infrastructure — the DI composition root (in Commands) wires those in.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Civil3DAIAgent.Application</RootNamespace>
+    <AssemblyName>Civil3DAIAgent.Application</AssemblyName>
+  </PropertyGroup>
+
+  <Import Project="..\Civil3D.References.props" />
+
+  <ItemGroup>
+    <ProjectReference Include="..\Civil3DAIAgent.Models\Civil3DAIAgent.Models.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Core\Civil3DAIAgent.Core.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Logging\Civil3DAIAgent.Logging.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Utilities\Civil3DAIAgent.Utilities.csproj" />
+    <ProjectReference Include="..\Civil3DAIAgent.Civil3D\Civil3DAIAgent.Civil3D.csproj" />
+  </ItemGroup>
+
+</Project>
