@@ -138,12 +138,11 @@ namespace Civil3DAIAgent.Tests.Infrastructure
             using (var wb = new XLWorkbook())
             {
                 var ws = wb.AddWorksheet("Points");
-                ws.Cell(1, 1).Value = "P"; ws.Cell(1, 2).Value = "E"; ws.Cell(1, 3).Value = "N";
-                ws.Cell(1, 4).Value = "Z"; ws.Cell(1, 5).Value = "D";
-                ws.Cell(2, 1).Value = 1; ws.Cell(2, 2).Value = 100.5; ws.Cell(2, 3).Value = 200.5;
-                ws.Cell(2, 4).Value = 12.3; ws.Cell(2, 5).Value = "EP";
-                ws.Cell(3, 1).Value = 2; ws.Cell(3, 2).Value = 101.0; ws.Cell(3, 3).Value = 201.0;
-                ws.Cell(3, 4).Value = 12.6; ws.Cell(3, 5).Value = "CL";
+                // Headers match POINTS.xlsx: POINT, EASTING, NORTHING, ELEVATION.
+                ws.Cell(1, 1).Value = "POINT"; ws.Cell(1, 2).Value = "EASTING";
+                ws.Cell(1, 3).Value = "NORTHING"; ws.Cell(1, 4).Value = "ELEVATION";
+                ws.Cell(2, 1).Value = 1; ws.Cell(2, 2).Value = 100.5; ws.Cell(2, 3).Value = 200.5; ws.Cell(2, 4).Value = 12.3;
+                ws.Cell(3, 1).Value = 2; ws.Cell(3, 2).Value = 101.0; ws.Cell(3, 3).Value = 201.0; ws.Cell(3, 4).Value = 12.6;
                 wb.SaveAs(path);
             }
 
@@ -154,7 +153,9 @@ namespace Civil3DAIAgent.Tests.Infrastructure
                 Assert.True(result.Succeeded);
                 Assert.Equal(2, result.Value.Count);
                 Assert.Equal(100.5, result.Value[0].Easting, 3);
-                Assert.Equal("EP", result.Value[0].Description);
+                Assert.Equal(200.5, result.Value[0].Northing, 3);
+                Assert.Equal(12.3, result.Value[0].Elevation, 3);
+                Assert.Equal(1, result.Value[0].PointNumber);
             }
             finally { File.Delete(path); }
         }

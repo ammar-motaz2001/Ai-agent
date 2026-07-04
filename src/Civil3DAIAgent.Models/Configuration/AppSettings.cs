@@ -79,19 +79,19 @@ namespace Civil3DAIAgent.Models.Configuration
         public int HeaderRow { get; set; } = 1;
 
         /// <summary>Header text (or column letter) that holds the point number.</summary>
-        public string PointNumberColumn { get; set; } = "P";
+        public string PointNumberColumn { get; set; } = "POINT";
 
         /// <summary>Header text (or column letter) that holds the Easting (X).</summary>
-        public string EastingColumn { get; set; } = "E";
+        public string EastingColumn { get; set; } = "EASTING";
 
         /// <summary>Header text (or column letter) that holds the Northing (Y).</summary>
-        public string NorthingColumn { get; set; } = "N";
+        public string NorthingColumn { get; set; } = "NORTHING";
 
         /// <summary>Header text (or column letter) that holds the Elevation (Z).</summary>
-        public string ElevationColumn { get; set; } = "Z";
+        public string ElevationColumn { get; set; } = "ELEVATION";
 
-        /// <summary>Header text (or column letter) that holds the description.</summary>
-        public string DescriptionColumn { get; set; } = "D";
+        /// <summary>Header text (or column letter) that holds the description (empty = none).</summary>
+        public string DescriptionColumn { get; set; } = "";
     }
 
     /// <summary>Polyline extraction configuration.</summary>

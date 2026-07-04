@@ -57,12 +57,14 @@ namespace Civil3DAIAgent.Infrastructure.Excel
                     int firstRow = used.FirstRow().RowNumber();
                     int lastRow = used.LastRow().RowNumber();
 
-                    // Resolve each logical field to a physical 1-based column number.
-                    int colEast = ResolveColumn(worksheet, settings.HeaderRow, settings.EastingColumn);
-                    int colNorth = ResolveColumn(worksheet, settings.HeaderRow, settings.NorthingColumn);
-                    int colElev = ResolveColumn(worksheet, settings.HeaderRow, settings.ElevationColumn);
-                    int colNum = ResolveColumn(worksheet, settings.HeaderRow, settings.PointNumberColumn);
-                    int colDesc = ResolveColumn(worksheet, settings.HeaderRow, settings.DescriptionColumn);
+                    // Resolve each logical field to a physical 1-based column number. The configured
+                    // value is tried first (as a header caption, then a column letter); if that fails,
+                    // common header synonyms are matched so slightly different files still work.
+                    int colEast = ResolveColumn(worksheet, settings.HeaderRow, settings.EastingColumn, "EASTING", "EAST", "X");
+                    int colNorth = ResolveColumn(worksheet, settings.HeaderRow, settings.NorthingColumn, "NORTHING", "NORTH", "Y");
+                    int colElev = ResolveColumn(worksheet, settings.HeaderRow, settings.ElevationColumn, "ELEVATION", "ELEV", "LEVEL", "RL", "Z");
+                    int colNum = ResolveColumn(worksheet, settings.HeaderRow, settings.PointNumberColumn, "POINT", "POINT NUMBER", "NUMBER", "PT", "ID");
+                    int colDesc = ResolveColumn(worksheet, settings.HeaderRow, settings.DescriptionColumn, "DESCRIPTION", "DESC", "CODE");
 
                     if (colEast <= 0 || colNorth <= 0 || colElev <= 0)
                         return OperationResult<IReadOnlyList<SurveyPoint>>.Fail(
@@ -141,34 +143,51 @@ namespace Civil3DAIAgent.Infrastructure.Excel
         /// caption in <paramref name="headerRow"/>; if that fails, treats the specifier as a column
         /// letter. Returns 0 when it cannot be resolved.
         /// </summary>
-        private static int ResolveColumn(IXLWorksheet worksheet, int headerRow, string specifier)
+        private static int ResolveColumn(IXLWorksheet worksheet, int headerRow, string specifier, params string[] synonyms)
         {
-            if (string.IsNullOrWhiteSpace(specifier)) return 0;
-            specifier = specifier.Trim();
-
-            // 1) Header-caption match.
-            if (headerRow > 0)
+            // 1) The configured specifier: header caption first, then column letter.
+            if (!string.IsNullOrWhiteSpace(specifier))
             {
-                var header = worksheet.Row(headerRow);
-                var lastCol = worksheet.RangeUsed()?.LastColumn()?.ColumnNumber() ?? 0;
-                for (int c = 1; c <= lastCol; c++)
+                specifier = specifier.Trim();
+
+                int byHeader = MatchHeader(worksheet, headerRow, specifier);
+                if (byHeader > 0) return byHeader;
+
+                if (IsColumnLetter(specifier))
                 {
-                    var caption = header.Cell(c).GetString()?.Trim();
-                    if (!string.IsNullOrEmpty(caption) &&
-                        string.Equals(caption, specifier, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return c;
-                    }
+                    try { return XLHelper.GetColumnNumberFromLetter(specifier.ToUpperInvariant()); }
+                    catch { /* fall through to synonyms */ }
                 }
             }
 
-            // 2) Column-letter fallback (e.g. "E", "AB").
-            if (IsColumnLetter(specifier))
+            // 2) Synonym fallback (header captions only) so common variants still resolve.
+            if (synonyms != null)
             {
-                try { return XLHelper.GetColumnNumberFromLetter(specifier.ToUpperInvariant()); }
-                catch { return 0; }
+                foreach (var syn in synonyms)
+                {
+                    int c = MatchHeader(worksheet, headerRow, syn);
+                    if (c > 0) return c;
+                }
             }
 
+            return 0;
+        }
+
+        /// <summary>Returns the 1-based column whose header caption equals <paramref name="caption"/>, or 0.</summary>
+        private static int MatchHeader(IXLWorksheet worksheet, int headerRow, string caption)
+        {
+            if (headerRow <= 0 || string.IsNullOrWhiteSpace(caption)) return 0;
+            var header = worksheet.Row(headerRow);
+            var lastCol = worksheet.RangeUsed()?.LastColumn()?.ColumnNumber() ?? 0;
+            for (int c = 1; c <= lastCol; c++)
+            {
+                var text = header.Cell(c).GetString()?.Trim();
+                if (!string.IsNullOrEmpty(text) &&
+                    string.Equals(text, caption.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    return c;
+                }
+            }
             return 0;
         }
 
