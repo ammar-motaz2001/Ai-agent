@@ -25,7 +25,9 @@ namespace Civil3DAIAgent.Commands
                 // Build the DI container up front so the first command is instant and any wiring error
                 // surfaces at load time rather than on first use.
                 var automation = CompositionRoot.GetAutomationService();
-                automation.LogSink.Log(LogLevel.Information, "Civil3D AI Agent loaded. Type AICIVIL to start.", "Startup");
+                // Use the Info() extension (not LogLevel.*) — 'Autodesk.AutoCAD.Runtime' also declares an
+                // inaccessible 'LogLevel', which would shadow ours in this file.
+                automation.LogSink.Info("Civil3D AI Agent loaded. Type AICIVIL to start.", "Startup");
 
                 var ed = AcApp.DocumentManager?.MdiActiveDocument?.Editor;
                 ed?.WriteMessage("\nCivil3D AI Agent loaded. Type AICIVIL to open the automation window.\n");
