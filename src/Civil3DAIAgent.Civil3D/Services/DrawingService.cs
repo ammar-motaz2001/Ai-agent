@@ -75,60 +75,70 @@ namespace Civil3DAIAgent.Civil3D.Services
             {
                 return TransactionHelper.InTransaction(sourceDb, tr =>
                 {
-                    // 1) Honour an explicitly chosen handle when valid.
-                    if (!string.IsNullOrWhiteSpace(preferredHandle) &&
-                        TryResolveHandle(sourceDb, preferredHandle, out var chosenId) &&
-                        tr.GetObject(chosenId, OpenMode.ForRead) is Curve)
-                    {
-                        _logger.Info("Using the pre-selected road polyline (handle " + preferredHandle + ").", Category);
-                        return OperationResult<string>.Ok(preferredHandle);
-                    }
-
-                    // 2) Auto-detect: longest polyline on a configured road layer.
-                    var roadLayers = SplitCsv(roadLayersCsv);
                     var ms = (BlockTableRecord)tr.GetObject(
                         SymbolUtilityServices.GetBlockModelSpaceId(sourceDb), OpenMode.ForRead);
 
-                    Curve bestOnLayer = null, bestAny = null;
-                    double bestOnLayerLen = 0, bestAnyLen = 0;
+                    // 1) Honour an explicitly chosen handle when valid.
+                    if (!string.IsNullOrWhiteSpace(preferredHandle) &&
+                        TryResolveHandle(sourceDb, preferredHandle, out var chosenId) &&
+                        tr.GetObject(chosenId, OpenMode.ForRead) is Curve chosenCurve)
+                    {
+                        _logger.Info($"Using the pre-selected road centreline on layer '{chosenCurve.Layer}' " +
+                                     $"(handle {preferredHandle}).", Category);
+                        return OperationResult<string>.Ok(preferredHandle);
+                    }
+
+                    // 2) Auto-detect by LAYER. Considers every curve type (Line, Arc, Polyline, ...), so a
+                    //    centreline drawn as many separate segments is detected by the layer they share.
+                    var roadLayers = SplitCsv(roadLayersCsv);
+                    var totalLen = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+                    var count = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                    var longest = new Dictionary<string, Curve>(StringComparer.OrdinalIgnoreCase);
+                    var longestLen = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
 
                     foreach (ObjectId id in ms)
                     {
                         if (!(tr.GetObject(id, OpenMode.ForRead) is Curve curve)) continue;
-                        if (!IsPolylineType(curve)) continue;
-
                         double len = SafeCurveLength(curve);
                         if (len <= 0) continue;
+                        string layer = curve.Layer ?? "";
 
-                        if (len > bestAnyLen) { bestAnyLen = len; bestAny = curve; }
-
-                        if (roadLayers.Count > 0 &&
-                            roadLayers.Any(l => string.Equals(l, curve.Layer, StringComparison.OrdinalIgnoreCase)) &&
-                            len > bestOnLayerLen)
-                        {
-                            bestOnLayerLen = len; bestOnLayer = curve;
-                        }
+                        totalLen.TryGetValue(layer, out var t); totalLen[layer] = t + len;
+                        count.TryGetValue(layer, out var c); count[layer] = c + 1;
+                        longestLen.TryGetValue(layer, out var ll);
+                        if (len > ll) { longestLen[layer] = len; longest[layer] = curve; }
                     }
 
-                    var winner = bestOnLayer ?? bestAny;
-                    if (winner == null)
+                    if (totalLen.Count == 0)
                         return OperationResult<string>.Fail(
-                            "No polyline was found in the source drawing to use as the road centreline.");
+                            "No line/arc/polyline geometry was found in the source drawing to use as the road centreline.");
 
-                    if (bestOnLayer == null)
-                        _logger.Warn("No polyline found on the configured road layers; using the longest " +
-                                     "polyline in the drawing instead.", Category);
+                    // Prefer configured road layers (large bias), else the layer with the most curve length.
+                    string bestLayer = null; double bestScore = -1;
+                    foreach (var kv in totalLen)
+                    {
+                        bool isRoad = roadLayers.Any(l => string.Equals(l, kv.Key, StringComparison.OrdinalIgnoreCase));
+                        double score = kv.Value + (isRoad ? 1e9 : 0);
+                        if (score > bestScore) { bestScore = score; bestLayer = kv.Key; }
+                    }
 
+                    bool onRoadLayer = roadLayers.Any(l => string.Equals(l, bestLayer, StringComparison.OrdinalIgnoreCase));
+                    if (!onRoadLayer)
+                        _logger.Warn($"No geometry on the configured road layers ({roadLayersCsv}); using layer " +
+                                     $"'{bestLayer}' (most curve length). Set Extraction.RoadPolylineLayers in " +
+                                     "appsettings.json to your centreline layer for reliable detection.", Category);
+
+                    var representative = longest[bestLayer];
                     _logger.Info(string.Format(CultureInfo.InvariantCulture,
-                        "Selected road polyline on layer '{0}', length {1:F1} m (handle {2}).",
-                        winner.Layer, SafeCurveLength(winner), winner.Handle), Category);
+                        "Selected road layer '{0}': {1} segment(s), total length {2:F1} m (representative handle {3}).",
+                        bestLayer, count[bestLayer], totalLen[bestLayer], representative.Handle), Category);
 
-                    return OperationResult<string>.Ok(winner.Handle.ToString());
+                    return OperationResult<string>.Ok(representative.Handle.ToString());
                 });
             }
             catch (Exception ex)
             {
-                return OperationResult<string>.Fail("Failed while selecting the road polyline. " + Explain(ex), ex);
+                return OperationResult<string>.Fail("Failed while selecting the road centreline. " + Explain(ex), ex);
             }
         }
 
@@ -140,53 +150,71 @@ namespace Civil3DAIAgent.Civil3D.Services
                 return OperationResult<PolylineData>.Fail("The source database is not open.");
             if (lengthMeters <= 0)
                 return OperationResult<PolylineData>.Fail("The extraction length must be greater than zero.");
-            if (!TryResolveHandle(sourceDb, polylineHandle, out var plId))
-                return OperationResult<PolylineData>.Fail("Could not resolve the road polyline handle: " + polylineHandle);
+            if (!TryResolveHandle(sourceDb, polylineHandle, out var repId))
+                return OperationResult<PolylineData>.Fail("Could not resolve the road centreline handle: " + polylineHandle);
 
             var warnings = new List<string>();
             try
             {
                 return TransactionHelper.InTransaction(sourceDb, tr =>
                 {
-                    if (!(tr.GetObject(plId, OpenMode.ForRead) is Curve curve))
-                        return OperationResult<PolylineData>.Fail("The selected object is not a curve/polyline.");
+                    if (!(tr.GetObject(repId, OpenMode.ForRead) is Curve repCurve))
+                        return OperationResult<PolylineData>.Fail("The selected object is not a curve.");
+                    string layer = repCurve.Layer ?? "";
 
-                    double totalLength = SafeCurveLength(curve);
+                    // Collect an ordered point list for EVERY curve on the road layer (handles a
+                    // centreline split into many separate segments).
+                    var pieces = new List<List<Point3d>>();
+                    var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(sourceDb), OpenMode.ForRead);
+                    foreach (ObjectId id in ms)
+                    {
+                        if (!(tr.GetObject(id, OpenMode.ForRead) is Curve curve)) continue;
+                        if (!string.Equals(curve.Layer, layer, StringComparison.OrdinalIgnoreCase)) continue;
+                        if (SafeCurveLength(curve) <= 0) continue;
+                        var pts = GetCurvePoints(curve);
+                        if (pts.Count >= 2) pieces.Add(pts);
+                    }
+
+                    if (pieces.Count == 0)
+                        return OperationResult<PolylineData>.Fail("No usable centreline curves found on layer '" + layer + "'.");
+
+                    // Chain the segments end-to-end (nearest-endpoint greedy) into one point sequence.
+                    _logger.Debug($"Assembling centreline from {pieces.Count} segment(s) on layer '{layer}'.", Category);
+                    var chained = ChainPieces(pieces, out double maxGap);
+                    if (pieces.Count > 1)
+                        _logger.Info(string.Format(CultureInfo.InvariantCulture,
+                            "Joined {0} centreline segment(s) into one polyline (largest join gap {1:F2} m).", pieces.Count, maxGap), Category);
+                    if (maxGap > 5.0)
+                        warnings.Add(string.Format(CultureInfo.InvariantCulture,
+                            "Some centreline segments were up to {0:F1} m apart and were bridged with a straight line. " +
+                            "Verify the source drawing if the alignment looks wrong.", maxGap));
+
+                    double totalLength = PolylineLength(chained);
                     if (totalLength <= 0)
-                        return OperationResult<PolylineData>.Fail("The selected polyline has zero length.");
+                        return OperationResult<PolylineData>.Fail("The assembled centreline has zero length.");
 
-                    // If shorter than requested, take the whole thing.
+                    List<Point3d> segment;
                     if (totalLength <= lengthMeters + 1e-6)
                     {
                         warnings.Add(string.Format(CultureInfo.InvariantCulture,
-                            "The road polyline is only {0:F1} m long (shorter than the requested {1:F0} m); " +
-                            "the entire polyline was used.", totalLength, lengthMeters));
-                        var wholeData = BuildPolylineData(curve, warnings);
-                        return OperationResult<PolylineData>.Ok(wholeData,
-                            $"Extracted full polyline ({totalLength:F1} m).", warnings);
+                            "The road centreline is only {0:F1} m long (shorter than the requested {1:F0} m); the whole " +
+                            "centreline was used.", totalLength, lengthMeters));
+                        segment = chained;
+                    }
+                    else
+                    {
+                        segment = TruncateToLength(chained, lengthMeters);
                     }
 
-                    // Split at the point that is exactly lengthMeters along the curve.
-                    Point3d splitPt = curve.GetPointAtDist(lengthMeters);
-                    double splitParam = curve.GetParameterAtPoint(splitPt);
-
-                    var splits = curve.GetSplitCurves(new DoubleCollection(new[] { splitParam }));
-                    if (splits == null || splits.Count == 0)
-                        return OperationResult<PolylineData>.Fail(
-                            "Civil 3D could not split the polyline at the requested station.");
-
-                    // The first split curve is the leading segment we want.
-                    var firstSegment = splits[0] as Curve;
-                    var data = BuildPolylineData(firstSegment, warnings);
-
-                    // Dispose the temporary split curves (they are non-database-resident clones).
-                    foreach (DBObject obj in splits) { try { obj.Dispose(); } catch { /* ignore */ } }
+                    var data = new PolylineData { Elevation = 0.0, Closed = false, Length = PolylineLength(segment) };
+                    foreach (var p in segment) data.Vertices.Add(new PolylineVertex(p.X, p.Y, 0.0));
 
                     _logger.Info(string.Format(CultureInfo.InvariantCulture,
-                        "Extracted first {0:F0} m of the road ({1} vertices).", lengthMeters, data.VertexCount), Category);
+                        "Extracted first {0:F0} m of the road ({1} vertices from {2} segment(s)).",
+                        Math.Min(lengthMeters, totalLength), data.VertexCount, pieces.Count), Category);
 
                     return OperationResult<PolylineData>.Ok(data,
-                        $"Extracted {lengthMeters:F0} m.", warnings);
+                        $"Extracted {Math.Min(lengthMeters, totalLength):F0} m.", warnings);
                 });
             }
             catch (Exception ex)
@@ -348,11 +376,8 @@ namespace Civil3DAIAgent.Civil3D.Services
             }
         }
 
-        /// <summary>True for the polyline family (lightweight, 2D, 3D).</summary>
-        private static bool IsPolylineType(Curve curve)
-        {
-            return curve is Polyline || curve is Polyline2d || curve is Polyline3d;
-        }
+        /// <summary>Vertex sampling density (metres) when tessellating a curve into points.</summary>
+        private const double SampleStepMeters = 2.0;
 
         /// <summary>Curve length via the start/end parameters; returns 0 on any failure.</summary>
         private static double SafeCurveLength(Curve curve)
@@ -362,47 +387,111 @@ namespace Civil3DAIAgent.Civil3D.Services
         }
 
         /// <summary>
-        /// Builds neutral <see cref="PolylineData"/> from a curve. Lightweight polylines are captured
-        /// exactly (vertices + bulges). Other curve types are tessellated into straight segments (with a
-        /// warning) so the workflow can still proceed.
+        /// Samples a curve into an ordered list of planar points (Z dropped). Uniform distance sampling
+        /// preserves arcs/curves; straight segments contribute their endpoints. Explicit start/end points
+        /// are included so chaining connects exactly.
         /// </summary>
-        private static PolylineData BuildPolylineData(Curve curve, List<string> warnings)
+        private static List<Point3d> GetCurvePoints(Curve curve)
         {
-            var data = new PolylineData();
+            var pts = new List<Point3d>();
+            double len = SafeCurveLength(curve);
+            if (len <= 0) return pts;
 
-            if (curve is Polyline lwpl)
-            {
-                data.Elevation = lwpl.Elevation;
-                data.Closed = lwpl.Closed;
-                int n = lwpl.NumberOfVertices;
-                for (int i = 0; i < n; i++)
-                {
-                    var pt = lwpl.GetPoint2dAt(i);
-                    double bulge = lwpl.GetBulgeAt(i);
-                    data.Vertices.Add(new PolylineVertex(pt.X, pt.Y, bulge));
-                }
-                data.Length = SafeCurveLength(lwpl);
-                return data;
-            }
-
-            // Fallback: sample the curve into straight chords.
-            warnings?.Add("The road object was not a lightweight polyline; it was approximated by sampling. " +
-                          "For best fidelity, use a 2D polyline as the road centreline.");
-
-            double total = SafeCurveLength(curve);
-            int samples = Math.Max(2, (int)Math.Ceiling(total / 5.0)); // a vertex roughly every 5 m
+            int samples = Math.Max(1, (int)Math.Ceiling(len / SampleStepMeters));
             for (int i = 0; i <= samples; i++)
             {
-                double dist = total * i / samples;
-                Point3d p;
-                try { p = curve.GetPointAtDist(dist); }
-                catch { continue; }
-                data.Vertices.Add(new PolylineVertex(p.X, p.Y, 0.0));
+                double d = len * i / samples;
+                try
+                {
+                    var p = curve.GetPointAtDist(d);
+                    pts.Add(new Point3d(p.X, p.Y, 0.0));
+                }
+                catch { /* skip an unsampleable station */ }
             }
-            data.Elevation = 0.0;
-            data.Closed = false;
-            data.Length = total;
-            return data;
+            return pts;
+        }
+
+        /// <summary>
+        /// Chains ordered point pieces end-to-end into a single connected sequence using a greedy
+        /// nearest-endpoint walk, reversing pieces as needed. Reports the largest bridged gap so the
+        /// caller can warn about disconnected centrelines.
+        /// </summary>
+        private static List<Point3d> ChainPieces(List<List<Point3d>> pieces, out double maxGap)
+        {
+            maxGap = 0.0;
+            var chain = new List<Point3d>();
+            var remaining = new List<List<Point3d>>(pieces);
+            if (remaining.Count == 0) return chain;
+
+            // Deterministic start: the piece endpoint with the smallest (X, then Y).
+            int startIdx = 0; bool startReversed = false; double bx = double.MaxValue, by = double.MaxValue;
+            for (int i = 0; i < remaining.Count; i++)
+            {
+                var s = remaining[i][0];
+                var e = remaining[i][remaining[i].Count - 1];
+                if (s.X < bx || (s.X == bx && s.Y < by)) { bx = s.X; by = s.Y; startIdx = i; startReversed = false; }
+                if (e.X < bx || (e.X == bx && e.Y < by)) { bx = e.X; by = e.Y; startIdx = i; startReversed = true; }
+            }
+            var first = remaining[startIdx];
+            if (startReversed) first.Reverse();
+            chain.AddRange(first);
+            remaining.RemoveAt(startIdx);
+
+            while (remaining.Count > 0)
+            {
+                var tail = chain[chain.Count - 1];
+                int bestI = 0; bool reverse = false; double best = double.MaxValue;
+                for (int i = 0; i < remaining.Count; i++)
+                {
+                    double ds = tail.DistanceTo(remaining[i][0]);
+                    double de = tail.DistanceTo(remaining[i][remaining[i].Count - 1]);
+                    if (ds < best) { best = ds; bestI = i; reverse = false; }
+                    if (de < best) { best = de; bestI = i; reverse = true; }
+                }
+
+                var piece = remaining[bestI];
+                if (reverse) piece.Reverse();
+                if (best > maxGap) maxGap = best;
+
+                int startAt = best < 1e-6 ? 1 : 0; // skip a coincident joint point
+                for (int k = startAt; k < piece.Count; k++) chain.Add(piece[k]);
+                remaining.RemoveAt(bestI);
+            }
+            return chain;
+        }
+
+        /// <summary>Total planar length of an ordered point list.</summary>
+        private static double PolylineLength(List<Point3d> pts)
+        {
+            double len = 0.0;
+            for (int i = 1; i < pts.Count; i++) len += pts[i - 1].DistanceTo(pts[i]);
+            return len;
+        }
+
+        /// <summary>Returns the leading portion of a point list up to <paramref name="maxLen"/> metres.</summary>
+        private static List<Point3d> TruncateToLength(List<Point3d> pts, double maxLen)
+        {
+            var result = new List<Point3d>();
+            if (pts.Count == 0) return result;
+
+            result.Add(pts[0]);
+            double acc = 0.0;
+            for (int i = 1; i < pts.Count; i++)
+            {
+                double seg = pts[i - 1].DistanceTo(pts[i]);
+                if (acc + seg >= maxLen)
+                {
+                    double t = seg > 1e-9 ? (maxLen - acc) / seg : 0.0;
+                    result.Add(new Point3d(
+                        pts[i - 1].X + (pts[i].X - pts[i - 1].X) * t,
+                        pts[i - 1].Y + (pts[i].Y - pts[i - 1].Y) * t,
+                        0.0));
+                    return result;
+                }
+                acc += seg;
+                result.Add(pts[i]);
+            }
+            return result;
         }
 
         /// <summary>Ensures a layer exists (creating it if needed) and returns its id (null id on failure).</summary>
