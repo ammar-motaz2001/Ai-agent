@@ -71,15 +71,26 @@ namespace Civil3DAIAgent.Application.Workflow
         public Task<WorkflowResult> RunAsync(
             WorkflowRequest request, IProgress<WorkflowProgress> progress, CancellationToken cancellationToken)
         {
-            return RunInternalAsync(request, progress, cancellationToken);
+            // CRITICAL: run fully synchronously and return an already-completed task. The Civil 3D API
+            // has hard thread affinity to the main document thread; introducing any await that resumes
+            // on a thread-pool thread (e.g. Task.Yield / Task.Run) makes the next API call crash the
+            // process with an access violation. The caller invokes this on the main thread, so all API
+            // calls stay on the correct thread. The UI trades some responsiveness for correctness.
+            try
+            {
+                return Task.FromResult(RunSynchronously(request, progress, cancellationToken));
+            }
+            catch (Exception ex)
+            {
+                // Never let the engine throw to the UI/host.
+                _logger.Critical("Engine failed before completing: " + (_explainer?.Explain(ex) ?? ex.Message), ex, Category);
+                var fallback = new WorkflowResult { StartedUtc = DateTime.UtcNow, FinishedUtc = DateTime.UtcNow };
+                return Task.FromResult(fallback);
+            }
         }
 
-        /// <summary>
-        /// Run implementation. Civil 3D work is synchronous and stays on the command-context thread; a
-        /// <c>Task.Yield()</c> between steps lets the caller's UI repaint and process the progress and
-        /// log updates that were just posted.
-        /// </summary>
-        private async Task<WorkflowResult> RunInternalAsync(WorkflowRequest request, IProgress<WorkflowProgress> progress, CancellationToken ct)
+        /// <summary>Synchronous run implementation. Executes entirely on the caller's (document) thread.</summary>
+        private WorkflowResult RunSynchronously(WorkflowRequest request, IProgress<WorkflowProgress> progress, CancellationToken ct)
         {
             var result = new WorkflowResult { StartedUtc = DateTime.UtcNow };
             var settings = _configuration?.Settings ?? new AppSettings();
@@ -113,14 +124,14 @@ namespace Civil3DAIAgent.Application.Workflow
 
                     foreach (var step in _steps)
                     {
+                        runLogger.Info($"──► BEGIN step {(int)step.StepType}/23: {step.DisplayName}", Category);
                         ReportProgress(progress, completed, total, step, StepStatus.Running);
-
-                        // Let the UI repaint / process the "running" progress before the blocking step.
-                        await Task.Yield();
 
                         var stepResult = ExecuteStep(step, context, runLogger);
                         result.Steps.Add(stepResult);
                         completed++;
+                        runLogger.Info($"──◄ END   step {(int)step.StepType}/23: {step.DisplayName} → {stepResult.Status} " +
+                                       $"({stepResult.Duration.TotalSeconds:F2}s)", Category);
 
                         ReportProgress(progress, completed, total, step, stepResult.Status);
 

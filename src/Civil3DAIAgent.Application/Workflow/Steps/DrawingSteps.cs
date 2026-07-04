@@ -86,8 +86,9 @@ namespace Civil3DAIAgent.Application.Workflow.Steps
     public sealed class CreateNewDrawingStep : WorkflowStepBase
     {
         private readonly IDrawingService _drawing;
+        private readonly ICivilDocProvider _docs;
         /// <summary>Creates the step.</summary>
-        public CreateNewDrawingStep(IDrawingService drawing) { _drawing = drawing; }
+        public CreateNewDrawingStep(IDrawingService drawing, ICivilDocProvider docs) { _drawing = drawing; _docs = docs; }
         /// <inheritdoc />
         public override WorkflowStepType StepType => WorkflowStepType.CreateNewDrawing;
         /// <inheritdoc />
@@ -98,6 +99,8 @@ namespace Civil3DAIAgent.Application.Workflow.Steps
             var res = _drawing.CreateNewDrawing(context.Settings.Paths.DrawingTemplate);
             if (res.Failed) return res;
 
+            // Pin the new drawing so every later step operates on it (not a stale MdiActiveDocument).
+            _docs.SetActiveDocument(res.Value);
             context.Set(WorkflowContextKeys.NewDrawingPath, res.Value?.Name ?? "");
             return OperationResult.Ok(res.Message);
         }

@@ -11,7 +11,6 @@ using Civil3DAIAgent.Models.Enums;
 using Civil3DAIAgent.Models.Workflow;
 using Civil3DAIAgent.Services.Facade;
 using Civil3DAIAgent.UI.Mvvm;
-using AcApp = Autodesk.AutoCAD.ApplicationServices.Application;
 
 namespace Civil3DAIAgent.UI.ViewModels
 {
@@ -164,15 +163,23 @@ namespace Civil3DAIAgent.UI.ViewModels
             WorkflowResult result = null;
             try
             {
-                // Run inside the Civil 3D command context so the API calls are valid.
-                await AcApp.DocumentManager.ExecuteInCommandContextAsync(async _ =>
-                {
-                    result = await _automation.RunAsync(request, progress, _cts.Token);
-                }, null);
+                AppendLog(LogLevel.Information, "Starting workflow on the main document thread…", "UI");
+
+                // IMPORTANT: This runs synchronously on the current (main AutoCAD/UI) thread, which is
+                // application context here (the modeless window has no active command). That satisfies
+                // Civil 3D's thread affinity AND allows creating a new document (step 4). We deliberately
+                // do NOT use ExecuteInCommandContextAsync (it binds to the original document and faults
+                // when the workflow switches to the new drawing) and do NOT hop threads.
+                result = await _automation.RunAsync(request, progress, _cts.Token);
             }
             catch (Exception ex)
             {
+                // Absolute UI-level backstop so nothing escapes into Civil 3D.
                 AppendLog(LogLevel.Critical, "Run failed unexpectedly: " + ex.Message, "UI");
+                System.Windows.MessageBox.Show(
+                    "The run stopped due to an unexpected error:\n\n" + ex.Message +
+                    "\n\nSee the log window and the run log file for details.",
+                    "Civil3D AI Agent", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
             finally
             {

@@ -46,8 +46,11 @@ namespace Civil3DAIAgent.Civil3D.Services
             try
             {
                 // A "side database" lets us read the source without opening it as the active document.
+                _logger.Debug("API: new Database(false, true)", Category);
                 db = new Database(false, true);
+                _logger.Debug("API: Database.ReadDwgFile('" + dwgPath + "', FileShare.Read)", Category);
                 db.ReadDwgFile(dwgPath, FileShare.Read, allowCPConversion: true, password: null);
+                _logger.Debug("API: Database.CloseInput(true)", Category);
                 db.CloseInput(true);
 
                 _logger.Info("Opened source drawing: " + Path.GetFileName(dwgPath), Category);
@@ -208,8 +211,12 @@ namespace Civil3DAIAgent.Civil3D.Services
 
                 // Creating via the document manager makes the new drawing the active document, which is
                 // required for all subsequent Civil 3D operations (alignment, surface, ...).
+                // NOTE: DocumentManager.Add requires application context (no active command). The UI runs
+                // the workflow from a modeless window on the main thread, which satisfies this.
                 var docs = AcApp.DocumentManager;
+                _logger.Debug("API: DocumentManager.Add('" + (template ?? "(default)") + "')", Category);
                 var newDoc = docs.Add(template);
+                _logger.Debug("API: set DocumentManager.MdiActiveDocument", Category);
                 docs.MdiActiveDocument = newDoc;
 
                 _logger.Info("Created new drawing" +

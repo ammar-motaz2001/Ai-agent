@@ -22,6 +22,11 @@ namespace Civil3DAIAgent.Commands
         {
             try
             {
+                // Last-resort logging for anything that escapes our own handlers, so even a fatal error
+                // leaves a trace on disk for diagnosis.
+                AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+                System.Threading.Tasks.TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
                 // Build the DI container up front so the first command is instant and any wiring error
                 // surfaces at load time rather than on first use.
                 var automation = CompositionRoot.GetAutomationService();
@@ -42,7 +47,34 @@ namespace Civil3DAIAgent.Commands
         /// <inheritdoc />
         public void Terminate()
         {
-            // Nothing to clean up explicitly; the DI singletons are released with the process.
+            try
+            {
+                AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
+                System.Threading.Tasks.TaskScheduler.UnobservedTaskException -= OnUnobservedTaskException;
+            }
+            catch { /* shutting down */ }
+        }
+
+        private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+            => WriteCrashLog("AppDomain.UnhandledException", e.ExceptionObject as System.Exception);
+
+        private static void OnUnobservedTaskException(object sender, System.Threading.Tasks.UnobservedTaskExceptionEventArgs e)
+        {
+            WriteCrashLog("UnobservedTaskException", e.Exception);
+            e.SetObserved();
+        }
+
+        /// <summary>Appends a fatal error to a crash log next to the assembly and in %TEMP%. Never throws.</summary>
+        private static void WriteCrashLog(string source, System.Exception ex)
+        {
+            try
+            {
+                string line = "[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "] " + source + ": " +
+                              (ex?.ToString() ?? "(no exception object)") + Environment.NewLine;
+                string temp = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Civil3DAIAgent_crash.log");
+                System.IO.File.AppendAllText(temp, line);
+            }
+            catch { /* last-resort logger must never throw */ }
         }
     }
 }

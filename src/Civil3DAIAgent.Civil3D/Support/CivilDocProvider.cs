@@ -24,6 +24,13 @@ namespace Civil3DAIAgent.Civil3D.Support
 
         /// <summary>The Civil 3D document (styles, alignments, surfaces...) of the active drawing.</summary>
         CivilDocument ActiveCivilDocument { get; }
+
+        /// <summary>
+        /// Pins the document the workflow should operate on (set by the "create new drawing" step). Once
+        /// set, <see cref="ActiveDocument"/> returns this document instead of relying on
+        /// <c>MdiActiveDocument</c>, which can lag right after a new drawing is created.
+        /// </summary>
+        void SetActiveDocument(Document document);
     }
 
     /// <summary>
@@ -32,8 +39,13 @@ namespace Civil3DAIAgent.Civil3D.Support
     /// </summary>
     public sealed class CivilDocProvider : ICivilDocProvider
     {
+        private Document _pinned;
+
         /// <inheritdoc />
-        public Document ActiveDocument => AcApp.DocumentManager?.MdiActiveDocument;
+        public Document ActiveDocument => _pinned ?? AcApp.DocumentManager?.MdiActiveDocument;
+
+        /// <inheritdoc />
+        public void SetActiveDocument(Document document) => _pinned = document;
 
         /// <inheritdoc />
         public Database ActiveDatabase => ActiveDocument?.Database;

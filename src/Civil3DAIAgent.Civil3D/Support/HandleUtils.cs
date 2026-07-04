@@ -22,13 +22,20 @@ namespace Civil3DAIAgent.Civil3D.Support
             {
                 long value = Convert.ToInt64(handleString, 16);
                 id = db.GetObjectId(false, new Handle(value), 0);
-                return !id.IsNull;
+                return IsUsable(id);
             }
             catch
             {
                 return false;
             }
         }
+
+        /// <summary>
+        /// True when an <see cref="ObjectId"/> is safe to open: non-null, valid, and not erased. Always
+        /// check this before calling <c>Transaction.GetObject</c> — opening a null/erased id is a common
+        /// cause of hard (unmanaged) Civil 3D crashes.
+        /// </summary>
+        public static bool IsUsable(ObjectId id) => !id.IsNull && id.IsValid && !id.IsErased;
 
         /// <summary>
         /// Resolves a handle string to an <see cref="ObjectId"/>, throwing
