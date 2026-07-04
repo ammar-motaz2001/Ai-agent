@@ -27,10 +27,11 @@ namespace Civil3DAIAgent.Application.Workflow
     /// </list>
     /// </summary>
     /// <remarks>
-    /// THREADING: the Civil 3D API must be exercised in the application/document context. The caller
-    /// (Commands/UI layer) invokes <see cref="RunAsync"/> through
-    /// <c>DocumentManager.ExecuteInCommandContextAsync</c>, which guarantees a valid document context.
-    /// Steps themselves acquire document locks via the Civil3D <c>TransactionHelper</c>.
+    /// THREADING: the Civil 3D API has hard affinity to AutoCAD's main (document) thread. The engine
+    /// therefore runs the whole workflow SYNCHRONOUSLY on the caller's thread and never introduces an
+    /// await that could resume on a thread-pool thread. The UI calls <see cref="RunAsync"/> from the
+    /// modeless window on the main thread (application context), and steps acquire document locks via
+    /// the Civil3D <c>TransactionHelper</c> before modifying a drawing.
     /// </remarks>
     public sealed class WorkflowEngine : IWorkflowEngine
     {

@@ -16,8 +16,8 @@ namespace Civil3DAIAgent.UI.ViewModels
 {
     /// <summary>
     /// The main window's view model. Binds the input pickers, run/cancel commands, progress bar, live
-    /// log, and per-step status list to the automation facade. All Civil 3D work runs through
-    /// <c>DocumentManager.ExecuteInCommandContextAsync</c> to guarantee a valid document context.
+    /// log, and per-step status list to the automation facade. The workflow runs synchronously on the
+    /// main (document) thread to satisfy Civil 3D's thread affinity — see <see cref="StartAsync"/>.
     /// </summary>
     public sealed class MainViewModel : ObservableObject
     {
