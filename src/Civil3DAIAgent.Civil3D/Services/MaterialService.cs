@@ -10,6 +10,8 @@ using Civil3DAIAgent.Logging;
 using Civil3DAIAgent.Models.Configuration;
 using Civil3DAIAgent.Models.Results;
 using Civil3DAIAgent.Models.Volumes;
+using Civil3DAIAgent.Utilities.Text;
+using CivSurface = Autodesk.Civil.DatabaseServices.Surface;
 
 namespace Civil3DAIAgent.Civil3D.Services
 {
@@ -17,15 +19,20 @@ namespace Civil3DAIAgent.Civil3D.Services
     /// Default <see cref="IMaterialService"/>.
     /// </summary>
     /// <remarks>
-    /// VERSION SENSITIVITY + DATA DEPENDENCY: material lists require the quantity-takeoff criteria's
-    /// surface conditions to be mapped to real surfaces, and they only yield non-zero volumes when the
-    /// corridor actually produced geometry. When the corridor is empty (see the assembly limitation),
-    /// this reports zero volumes rather than failing. The material-list and volume-extraction calls are
+    /// The Civil 3D managed API does not expose usable material-list / quantity-takeoff classes, so
+    /// earthwork quantities are computed the reliable, supported way: a <see cref="TinVolumeSurface"/>
+    /// (a "volume surface") between the existing-ground surface (base) and the datum surface
+    /// (comparison). Its volume properties give cut, fill, and net directly. This only yields non-zero
+    /// numbers when both surfaces exist with real data and overlap (i.e. the corridor produced a datum
+    /// surface); otherwise it reports zero with guidance rather than failing.
+    ///
+    /// VERSION SENSITIVITY: <c>TinVolumeSurface.Create(...)</c> and <c>GetVolumeProperties()</c> are
     /// tagged "// [VERSION]".
     /// </remarks>
     public sealed class MaterialService : IMaterialService
     {
         private const string Category = "Materials";
+        private const string VolumeSurfaceBaseName = "AI-CutFill-Volume";
 
         private readonly ILogger _logger;
         private readonly IExceptionExplainer _explainer;
@@ -53,33 +60,45 @@ namespace Civil3DAIAgent.Civil3D.Services
                 return TransactionHelper.InDocumentLock(targetDocument, () =>
                 {
                     var db = targetDocument.Database;
-                    if (!HandleUtils.TryResolve(db, sampleLineGroupHandle, out var groupId))
-                        return OperationResult<string>.Fail("Could not find the sample-line group for materials.");
-
                     var civilDoc = CivilDocument.GetCivilDocument(db);
 
-                    // Resolve the quantity-takeoff criteria (graceful fallback to first available).
-                    ObjectId criteriaId = StyleResolver.Resolve(
-                        civilDoc.Styles.QuantityTakeoffCriterias, settings.QuantityTakeoffCriteria,
-                        _logger, "quantity-takeoff criteria");
+                    ObjectId egId = ObjectId.Null;
+                    ObjectId datumId = ObjectId.Null;
+                    var existingNames = new List<string>();
 
-                    string listName = null;
                     TransactionHelper.InTransaction(db, tr =>
                     {
-                        var group = (SampleLineGroup)tr.GetObject(groupId, OpenMode.ForWrite);
-
-                        // [VERSION] Create a material list on the group from the criteria.
-                        ObjectId materialListId = group.MaterialLists.Add(settings.QuantityTakeoffCriteria);
-                        var materialList = (MaterialList)tr.GetObject(materialListId, OpenMode.ForWrite);
-                        listName = materialList.Name;
-
-                        // [VERSION] Import materials from the criteria; map surface conditions to our
-                        // EG and datum surfaces. Guarded because criteria mapping differs across releases.
-                        MapCriteriaSurfaces(db, materialList, criteriaId, existingGroundSurfaceHandle, datumSurfaceName, warnings);
+                        HandleUtils.TryResolve(db, existingGroundSurfaceHandle, out egId);
+                        datumId = FindSurfaceByName(civilDoc, tr, datumSurfaceName, existingNames);
                     });
 
-                    _logger.Info($"Created material list '{listName}' on the sample-line group.", Category);
-                    return OperationResult<string>.Ok(listName, "Material list created.", warnings);
+                    if (egId.IsNull)
+                    {
+                        warnings.Add("The existing-ground surface was not available; volumes cannot be computed.");
+                        return OperationResult<string>.Ok("", "No volume surface created.", warnings);
+                    }
+                    if (datumId.IsNull)
+                    {
+                        warnings.Add("The datum surface '" + (datumSurfaceName ?? "") + "' is not a standalone " +
+                                     "surface (the corridor may be empty), so cut/fill volumes cannot be computed. " +
+                                     "Build the corridor with a real datum surface to enable earthwork quantities.");
+                        _logger.Warn(warnings[warnings.Count - 1], Category);
+                        return OperationResult<string>.Ok("", "No volume surface created.", warnings);
+                    }
+
+                    string name = NameUtils.MakeUnique(VolumeSurfaceBaseName, existingNames);
+
+                    // [VERSION] Create a volume surface: base = existing ground, comparison = datum.
+                    ObjectId volumeId = TinVolumeSurface.Create(name, egId, datumId);
+
+                    string createdName = name;
+                    TransactionHelper.InTransaction(db, tr =>
+                    {
+                        if (tr.GetObject(volumeId, OpenMode.ForRead) is CivSurface vs) createdName = vs.Name;
+                    });
+
+                    _logger.Info($"Created volume surface '{createdName}' (EG vs datum) for earthwork quantities.", Category);
+                    return OperationResult<string>.Ok(createdName, "Volume surface created.", warnings);
                 });
             }
             catch (Exception ex)
@@ -104,29 +123,37 @@ namespace Civil3DAIAgent.Civil3D.Services
                 return TransactionHelper.InDocumentLock(targetDocument, () =>
                 {
                     var db = targetDocument.Database;
-                    if (!HandleUtils.TryResolve(db, sampleLineGroupHandle, out var groupId))
-                        return OperationResult<VolumeSummary>.Fail("Could not find the sample-line group for cut/fill.");
-
+                    var civilDoc = CivilDocument.GetCivilDocument(db);
                     var summary = new VolumeSummary();
+
+                    if (string.IsNullOrEmpty(materialListName))
+                    {
+                        warnings.Add("No volume surface was created in the previous step, so cut/fill is zero.");
+                        return OperationResult<VolumeSummary>.Ok(summary, "No volumes.", warnings);
+                    }
 
                     TransactionHelper.InTransaction(db, tr =>
                     {
-                        var group = (SampleLineGroup)tr.GetObject(groupId, OpenMode.ForRead);
-                        ObjectId materialListId = FindMaterialList(tr, group, materialListName);
-                        if (materialListId.IsNull)
+                        ObjectId volumeId = FindSurfaceByName(civilDoc, tr, materialListName, null);
+                        if (volumeId.IsNull)
                         {
-                            warnings.Add("No material list was found to read cut/fill volumes from.");
+                            warnings.Add("The volume surface '" + materialListName + "' was not found.");
                             return;
                         }
 
-                        var materialList = (MaterialList)tr.GetObject(materialListId, OpenMode.ForRead);
-                        ExtractVolumes(materialList, settings, summary, warnings);
+                        if (!(tr.GetObject(volumeId, OpenMode.ForRead) is TinVolumeSurface volumeSurface))
+                        {
+                            warnings.Add("'" + materialListName + "' is not a volume surface.");
+                            return;
+                        }
+
+                        ReadVolumes(volumeSurface, settings, summary, warnings);
                     });
 
                     if (summary.IsEmpty)
                     {
-                        warnings.Add("Computed cut and fill are both zero. This is expected when the corridor " +
-                                     "produced no geometry (empty assembly) or the surfaces do not overlap.");
+                        warnings.Add("Computed cut and fill are both zero — expected when the corridor produced " +
+                                     "no geometry or the surfaces do not overlap.");
                         _logger.Warn(warnings[warnings.Count - 1], Category);
                     }
                     else
@@ -144,83 +171,49 @@ namespace Civil3DAIAgent.Civil3D.Services
             }
         }
 
-        /// <summary>
-        /// Maps the criteria's surface conditions to the EG and datum surfaces. Best-effort: if the
-        /// mapping API differs, records a warning instead of failing.
-        /// </summary>
-        private void MapCriteriaSurfaces(Database db, MaterialList materialList, ObjectId criteriaId,
-            string egSurfaceHandle, string datumSurfaceName, List<string> warnings)
-        {
-            try
-            {
-                if (!criteriaId.IsNull)
-                {
-                    // [VERSION] Import material definitions from the criteria.
-                    materialList.ImportCriteria(criteriaId);
-                }
-
-                // Note: mapping the criteria's named surface conditions to our specific EG/datum
-                // surfaces is release-specific. If volumes come out zero, open Compute Materials in
-                // Civil 3D and confirm the surface mapping. We surface this as guidance rather than
-                // guessing at an API that varies.
-                warnings.Add("Material list created from criteria. If cut/fill volumes are zero, verify the " +
-                             "surface mapping (EG ↔ '" + (egSurfaceHandle ?? "") + "', datum ↔ '" +
-                             (datumSurfaceName ?? "") + "') in Compute Materials.");
-            }
-            catch (Exception ex)
-            {
-                warnings.Add("Could not import quantity-takeoff criteria automatically: " +
-                             (_explainer?.Explain(ex) ?? ex.Message));
-            }
-        }
-
-        /// <summary>Sums cut/fill across the material list, applying the configured factors.</summary>
-        private void ExtractVolumes(MaterialList materialList, MaterialSettings settings,
+        /// <summary>Reads cut/fill from the volume surface and applies the configured factors.</summary>
+        private void ReadVolumes(TinVolumeSurface volumeSurface, MaterialSettings settings,
             VolumeSummary summary, List<string> warnings)
         {
             try
             {
-                double cut = 0, fill = 0;
-                // [VERSION] Iterate materials and accumulate cut/fill volumes. Property/collection names
-                // are guarded; a difference degrades to a warning + zero volumes.
-                foreach (Material material in materialList)
-                {
-                    string name = material.Name ?? "";
-                    double volume = material.Volume;
-                    if (name.IndexOf("cut", StringComparison.OrdinalIgnoreCase) >= 0)
-                        cut += volume;
-                    else if (name.IndexOf("fill", StringComparison.OrdinalIgnoreCase) >= 0)
-                        fill += volume;
-                }
+                // [VERSION] Volume properties expose cut/fill/net (unadjusted) volumes.
+                var props = volumeSurface.GetVolumeProperties();
+                double cut = props.UnadjustedCutVolume;
+                double fill = props.UnadjustedFillVolume;
 
                 summary.CutVolume = cut * (settings.CutFactor <= 0 ? 1.0 : settings.CutFactor);
                 summary.FillVolume = fill * (settings.FillFactor <= 0 ? 1.0 : settings.FillFactor);
             }
             catch (Exception ex)
             {
-                warnings.Add("Could not read volumes from the material list automatically: " +
+                warnings.Add("Could not read volumes from the volume surface automatically: " +
                              (_explainer?.Explain(ex) ?? ex.Message) +
-                             " Volumes are available in the Civil 3D Volume Report.");
+                             " Volumes are available in the Civil 3D Volumes Dashboard.");
             }
         }
 
-        /// <summary>Finds a material list on the group by name (or the first one when name is blank).</summary>
-        private static ObjectId FindMaterialList(Transaction tr, SampleLineGroup group, string name)
+        /// <summary>
+        /// Finds a TIN/volume surface by name among the drawing's surfaces. Optionally collects all
+        /// surface names into <paramref name="allNames"/> (for uniqueness checks).
+        /// </summary>
+        private static ObjectId FindSurfaceByName(CivilDocument civilDoc, Transaction tr, string name, List<string> allNames)
         {
-            try
+            var result = ObjectId.Null;
+            var ids = civilDoc.GetSurfaceIds();
+            if (ids == null) return result;
+
+            foreach (ObjectId id in ids)
             {
-                foreach (ObjectId id in group.MaterialLists)
+                if (!(tr.GetObject(id, OpenMode.ForRead) is CivSurface s)) continue;
+                allNames?.Add(s.Name);
+                if (result.IsNull && !string.IsNullOrEmpty(name) &&
+                    string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase))
                 {
-                    var ml = (MaterialList)tr.GetObject(id, OpenMode.ForRead);
-                    if (string.IsNullOrEmpty(name) || string.Equals(ml.Name, name, StringComparison.OrdinalIgnoreCase))
-                        return id;
+                    result = id;
                 }
             }
-            catch
-            {
-                // Collection shape differs; return null id.
-            }
-            return ObjectId.Null;
+            return result;
         }
     }
 }

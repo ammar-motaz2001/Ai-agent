@@ -15,7 +15,7 @@ namespace Civil3DAIAgent.Civil3D.Diagnostics
     public sealed class Civil3DExceptionExplainer : IExceptionExplainer
     {
         /// <inheritdoc />
-        public string Explain(Exception exception)
+        public string Explain(System.Exception exception)
         {
             if (exception == null) return "An unknown error occurred (no exception details available).";
 

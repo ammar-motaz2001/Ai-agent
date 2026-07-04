@@ -25,7 +25,7 @@ namespace Civil3DAIAgent.Commands
                 var automation = CompositionRoot.GetAutomationService();
                 AgentLauncher.Show(automation);
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 ed?.WriteMessage("\nCould not open Civil3D AI Agent: " + ex.Message + "\n");
             }

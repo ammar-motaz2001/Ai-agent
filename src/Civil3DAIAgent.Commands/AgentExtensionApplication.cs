@@ -30,7 +30,7 @@ namespace Civil3DAIAgent.Commands
                 var ed = AcApp.DocumentManager?.MdiActiveDocument?.Editor;
                 ed?.WriteMessage("\nCivil3D AI Agent loaded. Type AICIVIL to open the automation window.\n");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 var ed = AcApp.DocumentManager?.MdiActiveDocument?.Editor;
                 ed?.WriteMessage("\nCivil3D AI Agent failed to initialize: " + ex.Message + "\n");

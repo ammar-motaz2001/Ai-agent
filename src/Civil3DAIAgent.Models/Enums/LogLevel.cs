@@ -1,8 +1,8 @@
 namespace Civil3DAIAgent.Models.Enums
 {
     /// <summary>
-    /// Severity of a log entry, ordered from most verbose (<see cref="Trace"/>) to most severe
-    /// (<see cref="Critical"/>). A logger with a configured minimum level suppresses everything below it.
+    /// Severity of a log entry, ordered from most verbose (<see cref="LogLevel.Trace"/>) to most severe
+    /// (<see cref="LogLevel.Critical"/>). A logger with a configured minimum level suppresses everything below it.
     /// </summary>
     public enum LogLevel
     {
